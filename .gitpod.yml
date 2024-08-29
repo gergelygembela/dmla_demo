@@ -2,6 +2,6 @@
 tasks:
   - name: Set up DMLA
     init: curl https://bmeaut.github.io/DMLAWeb/updates/launcher/dmla --output dmla && chmod +x ./dmla   # runs during prebuild => https://www.gitpod.io/docs/configure/projects/prebuilds
-    command: ./dmla -y && PATH=$PWD:$PATH
+    command: ./dmla -y && PATH=$HOME/.dmla:$PATH
 
 
