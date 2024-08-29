@@ -1,8 +1,7 @@
 # List the start up tasks. Learn more: https://www.gitpod.io/docs/configure/workspaces/tasks
 tasks:
   - name: Set up DMLA
-    before: printf 'export PATH="%s:$PATH"\n' "$HOME/.dmla" >> $HOME/.bashrc && exit
-    init: curl https://bmeaut.github.io/DMLAWeb/updates/launcher/dmla --output dmla && chmod +x ./dmla   # runs during prebuild => https://www.gitpod.io/docs/configure/projects/prebuilds
+    init: curl https://bmeaut.github.io/DMLAWeb/updates/launcher/dmla --output dmla && chmod +x ./dmla && PATH=$PWD:$PATH   # runs during prebuild => https://www.gitpod.io/docs/configure/projects/prebuilds
     command: ./dmla -y && PATH=$HOME/.dmla:$PATH
 
 
