@@ -1,4 +1,5 @@
 {
     "dsharp.experimental.useWorkspaceProvidedBootstrap": true,
-    "dsharp.experimental.workspaceProvidedBootstrapPath": "bootstrap.dmla"
+    "dsharp.experimental.workspaceProvidedBootstrapPath": "bootstrap.dmla",
+    "dsharp.dev.runtime.useProfilingInstrument": false
 }
