@@ -1,0 +1,97 @@
+package WarehouseDemoPackage {
+    import Bootstrap
+    import Utility
+    import WarehousePackage
+
+ operation void Demo(){
+    Warehouse warehouse1= Create(Warehouse, "WH1");
+    Warehouse warehouse2= Create(Warehouse, "WH2");
+    InitWH(warehouse1);
+    
+    warehouse1.AddProduct(EnergeticPlus);
+    warehouse1.AddProduct(MobyDick_Copy1);
+    warehouse2.AddProduct(MobyDick_Copy2);
+    warehouse1.ShowProducts();
+
+    warehouse1.SellProduct(MobyDick_Copy1, 2);
+    warehouse1.SellProduct(MobyDick_Copy1);
+    warehouse1.SellProduct(EnergeticPlus, 52);
+    
+    warehouse1.ShowSaleStatistics();
+
+    BookSpec SW= Create(BookSpec, "StarWars")
+                .Set(PST.SSP, 
+                     Create(CurrencyValue, null)
+                     .Set(CurrencyValue.Currency, EUR)
+                     .Set(CurrencyValue.Amount, 10.95)
+                     .AddAnnotation(FinalInstance));
+    
+    warehouse1.AddProduct(Create(SW, "SW_Copy1")
+                          .AddAnnotation(FinalInstance));
+    
+    warehouse1.ShowProducts();    
+ }
+
+ operation void Test(){
+    ValidateSelf(MobyDick_Copy2);
+ }
+
+    operation void InitWH(Warehouse wh){
+        wh.RegisterPST(Create(PST_Reg, null)
+                            .Set(PST_Reg.Item, BookSpec)
+                            .Set(PST_Reg.IntroductionDate, 
+                                    Create(Date, null)
+                                        .Set(Date.Year, 2003)
+                                        .Set(Date.Month, 2)
+                                        .Set(Date.Day,1)));
+
+        wh.RegisterPST(
+                Create(PST_Reg, null)
+                    .Set(PST_Reg.Item, DVDSpec)
+                    .Set(PST_Reg.IntroductionDate, 
+                                    Create(Date, null)
+                                        .Set(Date.Year, 2023)
+                                        .Set(Date.Month, 3)
+                                        .Set(Date.Day,2)
+                                ));
+        wh.RegisterPST(
+                Create(PST_Reg, null)
+                    .Set(PST_Reg.Item, DVDPlayerSpec)
+                    .Set(PST_Reg.IntroductionDate, 
+                                    Create(Date, null)
+                                        .Set(Date.Year, 2005)
+                                        .Set(Date.Month, 4)
+                                        .Set(Date.Day,3)
+                        ));
+
+        wh.RegisterPST(
+                Create(PST_Reg, null)
+                    .Set(PST_Reg.Item, MobilePhoneSpec)
+                    .Set(PST_Reg.IntroductionDate, 
+                                    Create(Date, null)
+                                        .Set(Date.Year, 2006)
+                                        .Set(Date.Month, 5)
+                                        .Set(Date.Day,4)
+                        ));
+        
+        wh.RegisterPST(
+                Create(PST_Reg, null)
+                    .Set(PST_Reg.Item, MPCaseSpec)
+                    .Set(PST_Reg.IntroductionDate, 
+                                    Create(Date, null)
+                                        .Set(Date.Year, 2007)
+                                        .Set(Date.Month, 6)
+                                        .Set(Date.Day,5)
+                        ));
+
+        wh.RegisterPST(
+                Create(PST_Reg, null)
+                    .Set(PST_Reg.Item, AABatteryCellSpec)
+                    .Set(PST_Reg.IntroductionDate, 
+                                    Create(Date, null)
+                                        .Set(Date.Year, 2008)
+                                        .Set(Date.Month, 7)
+                                        .Set(Date.Day, 6)
+                                ));
+    }
+}

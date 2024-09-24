@@ -1,0 +1,366 @@
+package WarehousePackage {
+    import Bootstrap
+    import Utility
+    
+    entity Warehouse: Classifier {
+  
+        @Cardinality = {Min = 0; Max = -1;}
+        @Type = {TypeName = PST_Reg;}
+        new slot Portfolio;
+
+        @Cardinality = {Min = 0; Max = -1;}
+        @Type = {TypeName = SaleStat;}
+        new slot SaleStatistics;
+
+        @Cardinality = {Min = 0; Max = -1;}
+        @Type = {TypeName = PST;}
+        new slot Stock;
+
+        operation void RegisterPST(PST subject){
+             this.AddValue(Warehouse.Portfolio, subject);
+        }
+
+        operation Bool AddProduct(PST subject)
+        {
+            if (subject.GetAttributeByType(FinalInstance)==null){
+                PrintError("${GetID(subject)} is not final, cannot be added.");
+                return false;
+            }
+
+            //Check registered PSTs
+            Base[] registeredPSTs=new Base[];
+            if (this.Portfolio!=null)     
+                foreach(Base pst in GetValues(this.Portfolio))
+                {   
+                    Add(registeredPSTs, pst->Item);
+                }
+
+            if (!Contains(registeredPSTs, subject is BulkProduct?subject.FindMeta(BulkProduct):subject.FindMeta(PST)!!))
+            {
+                    PrintError("The Product specification type (${GetLocalID(subject.FindMeta(PST)!!)}) of ${GetID(subject)} is not registered in warehouse '${GetLocalID(this)}'!");
+                    return false;     
+            }
+
+            if (this.Stock!=null&&Contains(GetValues(this.Stock)!!, subject))
+            {
+                PrintError("The Product ${GetID(subject)} is already in warehouse '${GetLocalID(this)}'!");
+                return false;     
+            }
+                        
+            this.AddValue(Warehouse.Stock, subject);
+            return true;
+        }
+
+        operation void SellProduct(PST subject, Number Amount = 1)
+        {
+            if (subject.GetAttributeByType(FinalInstance)==null){
+                PrintError("${GetID(subject)} is not final, cannot be sold.");
+                return;
+            }
+                        
+            if (this.Stock==null||!Contains(GetValues(this.Stock)!!, subject))
+            {
+                PrintError("Product ${GetID(subject)} is not in warehouse '${GetLocalID(this)}'!");
+                return;
+            }
+
+            if (Amount>1) {
+                if (!(subject is BulkProduct)) {
+                    PrintError("Amount can be set only for bulk products");
+                    return;
+                }
+
+                //Check pack size
+                if (subject->AvailableAmount < subject->PackSize * Amount)
+                {
+                    PrintError("Not enough product (required ${subject->PackSize * Amount} has ${subject->AvailableAmount})");
+                    return;
+                }
+            }
+
+            Number price = subject.GetPrice()!! * Amount;
+            if (this.SaleStatistics==null) {
+                this.getOrCreateInstanceSlot(Warehouse.SaleStatistics);
+                SetValues(this.SaleStatistics, new Object[]);
+            }
+
+            Base currentMeta = GetMeta(subject)!!;
+            while(currentMeta != PST && currentMeta != BulkProduct) {
+                Bool metaFound= false;
+                foreach(SaleStat item in this.GetAll(Warehouse.SaleStatistics)){
+                    if (item->Item == currentMeta)
+                    {
+                        item->SoldValue = item->SoldValue + price;
+                        metaFound=true;
+                        break;
+                    }
+                }
+
+                if (!metaFound) 
+                { 
+                    this.AddValue(Warehouse.SaleStatistics, 
+                                    Create(SaleStat, null)
+                                        .Set(SaleStat.Item, currentMeta)
+                                        .Set(SaleStat.SoldValue, price));
+                }
+                currentMeta = GetMeta(currentMeta)!!;
+            }
+
+            Bool isEmpty =true;            
+            if (subject is BulkProduct)
+            {
+                foreach(SaleStat product in GetValues(this.Stock)) {
+                    if (product == subject)
+                    {
+                        Number itemCount = product->PackSize * Amount;
+                        product->AvailableAmount = product->AvailableAmount - itemCount;
+
+                        if (product->AvailableAmount > 0)
+                        {
+                          isEmpty = false;
+                          break;
+                        }
+                    }
+                }
+            }
+
+            if (isEmpty)
+                this.RemoveValue(Warehouse.Stock, subject);
+        }
+
+        operation void ShowSaleStatistics()
+        {
+            PrintLn("Sale stat of (${GetLocalID(this)}):");
+            if (this.SaleStatistics!=null)
+            {
+                foreach(SaleStat item in this.GetAll(Warehouse.SaleStatistics))
+                {
+                    PrintLn("${GetLocalID((item->Item)!!)} ${(item->SoldValue)} ${GetLocalID(item->Item->Currency)}");
+                }
+            }
+            PrintLn("----------------------------------");
+        }
+
+        operation void ShowProducts()
+        {
+            PrintLn("Products in warehouse ${GetLocalID(this)}: ");
+
+            if (this->Stock!=null)
+            foreach(PST item in GetValues(this.Stock))
+            {
+                PrintLn("> ${GetLocalID((item)!!)}");
+            }
+            PrintLn("----------------------------------");
+        }
+    }
+
+    entity SaleStat: Classifier {
+
+        @Type= {TypeName = Number;}
+        new slot SoldValue;
+
+        @Type= {TypeName = PST;}
+        new slot Item;
+    }
+
+    entity PST_Reg: Classifier 
+    {
+        @Type= {TypeName = Date;}
+        new slot IntroductionDate;
+
+        @Type= {TypeName = PST;}
+        new slot Item;
+    }
+
+    entity PST : Classifier {
+
+        @Type = {TypeName = Number;}
+        @Cardinality = {Min =1; Max=1;}
+        new slot TaxRate;
+
+        @Type = {TypeName = CurrencyType;}
+        @Cardinality = {Min =1; Max=1;}
+        new slot Currency;
+
+        @Type= {TypeName = CurrencyValue;}
+        @Cardinality = {Min =1; Max=1;}
+        new slot SSP;
+
+        @Type= {TypeName =  CurrencyValue;}
+        @Cardinality = {Min =0; Max=1;}
+        new slot ReducedPrice;
+
+        @Type= {TypeName = PST;}
+        @Cardinality = {Min =0; Max=1;}
+        new slot Recommends;
+
+        operation Number? GetPrice() {
+            Number? price = this->SSP==null?null:(this->SSP)!!->Amount;
+            Number? tax = this->TaxRate;
+            if (this->ReducedPrice!=null)
+                price = (this->ReducedPrice)!!->Amount;
+
+            if (tax==null|| price==null) return null;
+            
+            return price!!*(100-tax!!)/100;
+        }
+
+        override operation void Validate(Object subject, Base? context=null) {
+            CurrencyType? currency = subject->Currency;            
+            if (currency!=null)
+            {
+                CurrencyValue? SSP=subject->SSP;
+                if (SSP!=null&&SSP->Currency!=currency!!) 
+                    throw ValidationException {
+                            ValidationSource = this;
+                            Meta = this;
+                            Instances = new Base[];
+                            Category = "Warehouse";
+                            ErrorCode = "WH_1";
+                            Message = "Invalid currency: ${GetLocalID(currency!!)} vs ${GetLocalID((SSP->Currency)!!)}";
+                        };
+
+                CurrencyValue? ReducedPrice=subject->ReducedPrice;
+                if (ReducedPrice!=null){
+                    
+                    if (ReducedPrice->Currency!=currency!!) 
+                       throw ValidationException {
+                            ValidationSource = this;
+                            Meta = this;
+                            Instances = new Base[];
+                            Category = "Warehouse";
+                            ErrorCode = "WH_2";
+                            Message = "Invalid currency: ${GetLocalID(currency!!)} vs ${GetLocalID((ReducedPrice->Currency)!!)}";
+                        };
+                    
+                    if (ReducedPrice->Amount>SSP->Amount) 
+                        throw ValidationException {
+                            ValidationSource = this;
+                            Meta = this;
+                            Instances = new Base[];
+                            Category = "Warehouse";
+                            ErrorCode = "WH_3";
+                            Message = "Invalid reduced price.";
+                        };
+                }
+            }
+        }
+    }
+
+    entity BulkProduct: PST {
+        @Type = {TypeName = Number;}
+        new slot PackSize;
+
+        @Type = {TypeName = Number;}
+        new slot AvailableAmount;
+    }
+
+    entity BookSpec : PST {        
+        slot TaxRate = 7.0;
+        slot Currency = EUR;
+    }
+
+    entity MobyDick : BookSpec {
+        slot SSP : PST.SSP = {Currency=EUR; Amount = 9.95;}: CurrencyValue;
+    }
+
+    @FinalInstance  
+    entity MobyDick_Copy1: MobyDick { }
+
+    @FinalInstance
+    entity MobyDick_Copy2: MobyDick { 
+        slot SSP: MobyDick.SSP= {Currency=EUR; Amount = 19.95;}: CurrencyValue;
+
+        @Type= {TypeName = Date;}
+        new slot Returned = {Year = 2023; Month = 3; Day = 23; }: Date;
+        slot ReducedPrice = {Currency=EUR; Amount = 1.95;}: CurrencyValue;
+    }
+
+    entity DVDSpec : PST {        
+        slot TaxRate = 15.0;
+        slot Currency = USD;
+
+        //Not forced to specialized a PST instance
+        @Type= {TypeName=DVDPlayerSpec;}
+        slot Recommends;
+    }
+
+    @FinalInstance
+    entity SpaceOdyssey2001 : DVDSpec {
+        slot SSP = {Currency=USD; Amount = 19.95;}: CurrencyValue;
+        slot Recommends= haChi779;
+    }
+
+    entity DVDPlayerSpec: PST {
+          slot TaxRate = 15.0;
+          slot Currency= USD;
+    }
+
+    @FinalInstance
+    entity haChi779: DVDPlayerSpec {
+        slot SSP= {Currency=USD; Amount = 99.99;}: CurrencyValue;
+
+        @Type= {TypeName = String;}
+        new slot SerialNumber;
+    }
+
+    entity MobilePhoneSpec: PST{
+          slot TaxRate = 15.0;
+          slot Currency= SEK;
+
+          @Type= {TypeName=MPCaseSpec;}
+          slot Recommends;
+    }
+
+    @FinalInstance
+    entity Mate0815: MobilePhoneSpec {
+        slot SSP= {Currency=SEK; Amount = 599.15;}: CurrencyValue;
+        
+    }
+
+    entity MPCaseSpec: PST{
+          slot TaxRate = 15.0;
+          slot Currency= SEK;
+    }
+
+   @FinalInstance
+     entity Matey: MPCaseSpec {
+        slot SSP= {Currency=SEK; Amount = 17.95;}: CurrencyValue;        
+    }
+
+    entity AABatteryCellSpec: BulkProduct{
+          slot TaxRate: PST.TaxRate= 15.0;
+          slot Currency: PST.Currency= NZD;
+    }
+
+   @FinalInstance
+     entity EnergeticPlus: AABatteryCellSpec {
+        slot SSP: PST.SSP = {Currency=NZD; Amount = 1.5;}: CurrencyValue;        
+        slot PackSize: BulkProduct.PackSize = 10;
+        slot AvailableAmount: BulkProduct.AvailableAmount = 271820;
+    } 
+
+    entity CurrencyType : Classifier {}
+    
+    @FinalInstance
+    entity EUR: CurrencyType{}
+    
+    @FinalInstance
+    entity USD: CurrencyType{}
+    
+    @FinalInstance
+    entity SEK: CurrencyType{}
+    
+    @FinalInstance
+    entity NZD: CurrencyType{}
+
+    entity CurrencyValue : Classifier {
+        @Type= {TypeName = CurrencyType;}
+        @Cardinality= { Min=1;Max=1;}
+        slot Currency;
+
+        @Type= {TypeName = Number;}
+        @Cardinality= { Min=1;Max=1;}
+        slot Amount;
+    }    
+}
