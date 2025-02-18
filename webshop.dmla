@@ -1,0 +1,241 @@
+package Webshop {
+    import Bootstrap
+
+    entity Product: Classifier {
+        @Type = {TypeName = Number;}
+        new slot Price;
+
+        @Type = {TypeName = String;}
+        new slot Description;
+
+        //Error?
+        operation String GetName(){
+            return "${GetID(this)}";
+        }
+    }
+
+    entity Book: Product {
+        @Type = {TypeName = String;}
+        @Cardinality = {Min =1; Max=1;}
+        new slot Author;
+
+        @MaxLength = {Length = 10;}
+        @Type = {TypeName = String;}
+        new slot Title;
+
+        //operation override example
+        override operation String GetName() {
+            return "Book [${this.Get(Book.Author)}: ${this.Get(Book.Title)}]";
+        }
+    }
+
+    //Entity refinement, number and bool types
+    entity Vehicle : Product {
+
+        @Type = {TypeName = Number;}
+        new slot MaxSpeed;
+
+        @Type = {TypeName = Bool;}
+        new slot RequiresLicence;
+    }
+
+    @ManufacturerAndModel
+    entity Car: Vehicle {
+        @Type = {TypeName = String;}
+        new slot Manufacturer;
+        
+        @Type = {TypeName = String;}
+        new slot Model;
+
+        @Type = {TypeName = Number;}
+        new slot YearOfManufacture;
+    }
+
+    //Restricting a slot to a final value at high abstraction level
+    @ManufacturerAndModel
+    entity ToyotaCar: Car {
+        slot Manufacturer = "Toyota";
+    }
+
+    @ManufacturerAndModel
+    entity MobilePhone : Product {
+        @Type = {TypeName = String;}
+        new slot Manufacturer;
+
+        @Type = {TypeName = String;}
+        new slot Model;
+
+        @Type = {TypeName = OpSystemType;}
+        new slot OpSystem;
+
+        @Type = {TypeName = Number;}
+        new slot RamSize;
+    }
+
+    //Refinable enum
+    entity OpSystemType: Classifier {}
+    entity IOS: OpSystemType {}
+    entity Android: OpSystemType {} 
+
+    entity Android11: Android {}
+    entity Android12: Android {}
+    entity Android13: Android {}
+
+    //Common contract (partial structure definition) for different products   
+    entity ManufacturerAndModel : Contract {
+        @Type = {TypeName = String;}
+        @ContractSlot
+        new slot Manufacturer;
+
+        @Type = {TypeName = String;}
+        @ContractSlot
+        new slot Model;
+    }
+
+    entity Wheel: Product {
+        @Type = {TypeName = Number;}
+        new slot Size;
+    }
+
+    entity NCycle: Vehicle {
+        @Type = {TypeName = Wheel;}
+        @Cardinality = {Min=1; Max=3;}
+        new slot Wheels;
+
+        //TODO: shortcut, mert bonyolult a signature
+        //TODO: clabjectre valami jobb kifejezés
+        //General constraint for all N-Cycle's wheel, can handle slot division and clabjects
+        // this = metaEntity - subject is the entity we want to validate!
+        override operation void Validate(Object subject, Base? context=null) {
+            //TODO: GetFinal/GetAllFinal vagy hasonló, ami biztosítja, hogy ne kelljen mindig null checkelni
+            foreach(Wheel wheel in subject.GetAll(NCycle.Wheels)) {
+                //if (wheel->Size<8 || wheel->Size>24) {
+                if (wheel.Get(Wheel.Size)<8 || wheel.Get(Wheel.Size)>24) {
+                    //Validation exception                    
+                    throw new ValidationException {
+                        //TODO: fill these by default?
+                        ValidationSource = this;
+                        Meta = GetMeta(this);
+                        Instances = new Base[subject];
+                        Category = "Webshop";
+                        ErrorCode = "Webshop_NCycle_0";
+                        Message = "The size (${wheel.Get(Wheel.Size)}) of wheel '${GetID(wheel)}' is invalid in ${GetID(subject)}.";
+                    };	
+                }
+            }
+        
+        }
+    }
+
+    entity UniCycle: NCycle {
+        //Slot refinement, cardinality restriction
+        @Cardinality = {Min=1; Max=1;}
+        slot Wheels: NCycle.Wheels;
+    }
+
+    entity Bicycle: NCycle {
+        //Slot division       
+        @Cardinality = {Min=1; Max=1;}
+        slot FrontWheel: NCycle.Wheels;
+
+        @Cardinality = {Min=1; Max=1;}
+        slot RearWheel: NCycle.Wheels;
+
+        operation Bicycle BuildNewBike(Number size) {
+            Bicycle bike = Create(Bicycle)
+                            .Set(Bicycle.FrontWheel, Create(Wheel).Set(Wheel.Size, size))
+                            .Set(Bicycle.RearWheel, Create(Wheel).Set(Wheel.Size, size));
+
+            return bike;
+        }
+    }
+
+    entity WebshopWarehouse: Classifier {
+        @Cardinality = {Min=1; Max=-1;}
+        @Type = {TypeName = Product;}
+        new slot Stock;
+
+        override operation void ListAll() {
+            PrintLn("Warehouse: ${GetID(this)}");
+            foreach(Product product in GetAll(WebshopWarehouse.Stock)) {
+                PrintLn("Product: ${product.GetName()} ");
+            }
+        }
+    }
+
+    entity MaxLength: Annotation {
+
+        @Type= { TypeName= Number; }
+        @Cardinality= {Min= 1; Max=1; }
+        new slot Length;
+
+        override operation void Validate(Object subject, Base? context=null) {
+           // PrintLn("here");
+            
+            if (this.Get(MaxLength.Length)==null) return;
+            
+            PrintLn("${this.Get(MaxLength.Length)} vs ${subject.Get(MaxLength.Length)}");
+        }
+
+        override operation Bool Check(Base definedFor, Object appliesOn, Base? containerContext)
+		{			
+            if (this.Get(MaxLength.Length)==null) return true;
+            if (GetValue(appliesOn)==null) return true;
+            
+            if (StrLen(GetValue(appliesOn)!!) > this.Get(MaxLength.Length))
+                    throw new ValidationException {
+                        ValidationSource = this;
+                        Meta = GetMeta(this);
+                        Instances = new Base[appliesOn];
+                        Category = "Webshop";
+                        ErrorCode = "Webshop_MaxLength";
+                        Message = "The length of '${GetValue(appliesOn)}' stored in ${GetID(appliesOn)} is too long (max length: ${this.Get(MaxLength.Length)}).";
+                    };	
+
+            return true;
+		}
+    }
+
+    operation void ListAll(){
+        foreach(WebshopWarehouse warehouse in GetInstances(WebshopWarehouse, true))
+        {
+            warehouse.ListAll();
+        }    
+    }
+
+    operation void Test(){
+        WebshopWarehouse myWareHouse=Create(WebshopWarehouse);
+        Book myBook = Create(Book)
+                        .Set(Book.Title, "Hamlet")
+                        .Set(Book.Author, "William Shakespeare");   
+        myWareHouse.AddValue(WebshopWarehouse.Stock, Create(ToyotaCar));
+        myWareHouse.AddValue(WebshopWarehouse.Stock, Create(Bicycle));
+        myWareHouse.AddValue(WebshopWarehouse.Stock, Create(Book)
+                                                .Set(Book.Title, "Hamlet")
+                                                .Set(Book.Author, "William Shakespeare"));        
+        myWareHouse.ListAll();
+    }
+
+    operation void TestIt2() {
+        PrintLn(GetContainerEntities((ManufacturerAndModel.Manufacturer)!!));
+        PrintEntity((ManufacturerAndModel.Manufacturer)!!);
+    }
+
+
+
+    entity ScifiBook: Book {
+        @MaxLength = {Length = 4;}
+        slot Title: Book.Title;
+    }
+
+    operation void Test3() {
+        Book myBook = Create(ScifiBook).Set(Book.Title, "Hamlet78901");
+        //ScifiBook myBook = Create(ScifiBook).Set(ScifiBook.Title, "Hamlet7890");
+        PrintLn(ValidateSelf(myBook));
+
+       // Book myBook = Create(Book).Set(Book.Title,"Hamlet78901");
+       // PrintLn(ValidateSelf(Book));
+    }
+
+    
+}

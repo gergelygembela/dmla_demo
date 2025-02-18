@@ -28,15 +28,18 @@ package Bootstrap{
 	{
 		foreach(Base attrib in subject.GetAllSlots(withHierarchy))
 		{
-            _PrintAnnotations(attrib, level);
-            Object? value= GetValue(attrib);
-            if (value!=null) {
-                if (value is Base) {
-                    PrintLn_("|- ${GetLocalID(attrib)}: ${GetID(GetMeta(attrib))}=", level);
-                    PrintEntity(value!!, withHierarchy, level+1);
-                }
-                else
-       			    PrintLn_("|- ${GetLocalID(attrib)}= ${value}", level);
+            _PrintAnnotations(attrib, level);            
+            if (GetValues(attrib)!=null)
+			{
+				Object[] values = GetValues(attrib)!!;
+				PrintLn_("|- ${GetLocalID(attrib)}: ${GetID(GetMeta(attrib))}=", level);
+				foreach(Object value in values){
+					if (value is Base) {
+						PrintEntity(value!!, withHierarchy, level+1);
+					}
+					else
+						PrintLn_("|- ${value}", level+1);
+				}
             }
             else
        			PrintLn_("|- ${GetLocalID(attrib)}", level);
@@ -161,7 +164,7 @@ package Bootstrap{
 
 			Base? metaEntity=GetMeta(subject);
 			if (metaEntity == subject)
-                throw ValidationException {
+                throw new ValidationException {
                     ValidationSource = this;
                     Meta = metaEntity;
                     Instances = new Base[subject];
@@ -179,7 +182,7 @@ package Bootstrap{
 				//Attrib is a valid instance of its meta
 				String? errorMsg=ValidateGlobal(metaAttrib, attrib, subject);
 				if (errorMsg!=null) {
-				    throw ValidationException {
+				    throw new ValidationException {
         	            ValidationSource = this;
             	        Meta = metaAttrib;
                 	    Instances = new Base[attrib];
@@ -206,7 +209,7 @@ package Bootstrap{
 					if (attrib is Annotation)
 					{
 						if (!(attrib.Check(metaIterator!!, subject, context))) {
-							throw ValidationException {
+							throw new ValidationException {
 								ValidationSource = this;
 								Meta = metaEntity;
 								Instances =  new Base[attrib];
@@ -222,7 +225,7 @@ package Bootstrap{
 			}
 
 			if (Count(metaAttribList)>0)
-				throw ValidationException {
+				throw new ValidationException {
                 	ValidationSource = this;
                 	Meta = new Base[];
                 	Instances =  new Base[];
@@ -259,28 +262,40 @@ package Bootstrap{
 		}
 		return null;
 	}
-	
 
-	operation Base? GetAttributeByType(Base typeToFind, Bool transitiveAnnotations = true) {
-            Base? currentEntity = this;
-            while (currentEntity != null) {
-                foreach (Base attribute in GetAttributes(currentEntity!!))
-                    if (attribute == typeToFind)
-					{
-						return null; 
-					} 
-					else if (attribute.isTransitiveInstance(typeToFind)) {
-					    	return attribute;
+	//TODO: We cannot turn off the feature "search by contract slot" currently
+	operation Base? GetAttributeByType(Base typeToFind, Bool transitiveAnnotations = true, Bool searchForContractSlot=false) {
+		if (!searchForContractSlot) {
+			foreach (Base typeAttribute in GetAttributes(typeToFind)) {
+				if (typeAttribute is ContractSlot)
+					return GetAttributeByType(typeToFind, transitiveAnnotations, true);
+			}
+		}
 
-                    }
+        Base? currentEntity = this;			
+		while (currentEntity != null) {
+			foreach (Base attribute in GetAttributes(currentEntity!!))
+				if (attribute == typeToFind)
+				{
+					return null; 
+				} 
+				else
+					if (searchForContractSlot) {
+						if (GetLocalID(attribute)==GetLocalID(typeToFind))
+							return attribute;
+					}
+					else {
+						if (attribute.isTransitiveInstance(typeToFind)) 
+								return attribute;
+					}
 
 				if (transitiveAnnotations)
-                	currentEntity = GetMeta(currentEntity!!);
-				else
-					break;
-            }
+				currentEntity = GetMeta(currentEntity!!);
+			else
+				break;
+		}
 
-            return null;
+        return null;
     }
 
 		operation Slot[] GetAllSlots(Bool onMetaChain=true) {
@@ -321,6 +336,7 @@ package Bootstrap{
 			Base[] result=new Base[];
             while (currentEntity != null) {
                 foreach (Base attribute in GetAttributes(currentEntity!!))
+				{
                     if (attribute == typeToFind)
 					{
 						return result; 
@@ -329,6 +345,7 @@ package Bootstrap{
 					    	Add(result, attribute);
 
                     }
+				}
                 currentEntity = GetMeta(currentEntity!!);
             }
 
@@ -380,20 +397,20 @@ package Bootstrap{
 			return this;
 		}
 
-		operation Object? Get(Slot metaSlot){
-			Base? attrib = GetAttributeByType(metaSlot);
+		operation Object? Get(Slot? metaSlot){
+			if (metaSlot==null) return null;
+			Base? attrib = GetAttributeByType(metaSlot!!);
 			return attrib==null?null:GetValue(attrib!!);
 		}
 
-		operation Object[] GetAll(Slot metaSlot) {
+		operation Object[] GetAll(Slot? metaSlot) {
 			Object[] result = new Object[];
-            Base[] attribs = GetAllAttributesByType(metaSlot);
+			if (metaSlot==null) return result;
+            Base[] attribs = GetAllAttributesByType(metaSlot!!);
             foreach(Base b in attribs)
 			{
-				if (GetValue(b) != null)
-				{
-					result.Add(GetValue(b));
-				}
+				foreach(Object attribValue in GetValues(b))
+					result.Add(attribValue);
 			}
 			return result;
 		}
@@ -445,7 +462,7 @@ package Bootstrap{
 	entity Slot: Base {
 		override operation void Validate(Object subject, Base? context=null) {
 			if (!(subject is Base.Fields)&&!(subject is Base.Operations))
-				throw ValidationException {
+				throw new ValidationException {
                     ValidationSource = this;
                     Meta = GetMeta(subject);
                     Instances =  new Base[subject];
@@ -462,7 +479,7 @@ package Bootstrap{
 	entity Bool: Basic_Type { 
 		override operation void Validate(Object subject, Base? context=null) {
             if (!(subject is Bool))
-                throw ValidationException {
+                throw new ValidationException {
                     ValidationSource = this;
                     Meta = null;
                     Instances =  new Base[];
@@ -475,7 +492,7 @@ package Bootstrap{
 	entity String: Basic_Type {
 		 override operation void Validate(Object subject, Base? context=null) {
             if (!(subject is String))
-                throw ValidationException {
+                throw new ValidationException {
                     ValidationSource = this;
                     Meta = this;
                     Instances =  new Base[];
@@ -487,7 +504,7 @@ package Bootstrap{
 	entity Number: Basic_Type {
 		 override operation void Validate(Object subject, Base? context=null) {
             if (!(subject is Number))
-                throw ValidationException {
+                throw new ValidationException {
                     ValidationSource = this;
                     Meta = null;
                     Instances =  new Base[];
@@ -571,7 +588,7 @@ package Bootstrap{
 						//If the omit is applied in this entity, we can skip it
 						if (attrib == this) return true;
 
-						//We cannot throw exception yet, since it is possible that the annotation is also in 'appliesOn'
+						//We cannot throw new exception yet, since it is possible that the annotation is also in 'appliesOn'
 						//Cannot use the omitted attribute as meta
 						if (GetMeta(attrib)==entityToOmit)
 						{
@@ -581,7 +598,7 @@ package Bootstrap{
 				
 				if (failedAttrib != null)
 						{
-							throw ValidationException {
+							throw new ValidationException {
 								ValidationSource = this;
 								Meta = this;
 								Instances =  new Base[failedAttrib!!];
@@ -607,7 +624,7 @@ package Bootstrap{
 			
 			if (this->TypeName==null) return;
 			if (!subject.GetType().isTransitiveInstance(this.GetType(), true))
-			   throw ValidationException {
+			   throw new ValidationException {
                     ValidationSource = this;
                     Meta = GetMeta(this);
                     Instances =  new Base[subject];
@@ -634,7 +651,7 @@ package Bootstrap{
 					return ValidateGlobal((this->TypeName)!!, GetValue(appliesOn)!!, null)==null;
 
 				if (!(GetValue(appliesOn).isTransitiveInstance(this->TypeName, true)))
-					throw ValidationException {
+					throw new ValidationException {
 						ValidationSource = this;
 						Meta = null;
 						Instances =  new Base[];
@@ -655,7 +672,6 @@ package Bootstrap{
 
 		operation Number GetMin(){
 			//Base? minValue=this.GetAttributeByType(Cardinality.Min);
-			//return GetValue(minValue!!)!!;
 			Number? minV=this.Get(Cardinality.Min);
 			return minV==null?0:minV!!;
 		}
@@ -670,7 +686,7 @@ package Bootstrap{
 		override operation void Validate(Object subject, Base? context=null) {
 			Number? minInst = subject.Get(Cardinality.Min);
 			if (minInst!=null&& minInst!!<GetMin())
-				   throw ValidationException {
+				   throw new ValidationException {
                     ValidationSource = this;
                     Meta = this;
                     Instances =  new Base[];
@@ -681,7 +697,7 @@ package Bootstrap{
 
 			Number? maxInst = subject.Get(Cardinality.Max);
 			if (maxInst!=null&& maxInst!!>GetMax())
-				   throw ValidationException {
+				   throw new ValidationException {
                     ValidationSource = this;
                     Meta = this;
                     Instances =  new Base[];
@@ -698,7 +714,7 @@ package Bootstrap{
 			if (containerContext==null) return true;
 
 			if (!(appliesOn is Base)) 
-			    throw ValidationException {
+			    throw new ValidationException {
                     ValidationSource = this;
                     Meta = null;
                     Instances =  new Base[];
@@ -725,7 +741,7 @@ package Bootstrap{
 
 			if (subjectRoot==null)
 			{
-			    throw ValidationException {
+			    throw new ValidationException {
                     ValidationSource = this;
                     Meta = null;
                     Instances =  new Base[];
@@ -776,7 +792,7 @@ package Bootstrap{
 				}
 
 			if (this.GetMin() > minCount) {
-				 throw ValidationException {
+				 throw new ValidationException {
                     ValidationSource = this;
                     Meta = this;
                     Instances =  new Base[];//TODO 0615 - should be instances
@@ -787,7 +803,7 @@ package Bootstrap{
 			}
 
 			if (this.GetMax() < maxCount && maxCount<Number_MAX()) {
-				 throw ValidationException {
+				 throw new ValidationException {
                     ValidationSource = this;
                     Meta = this;
                     Instances =  new Base[];//TODO 0615 - should be instances
@@ -862,7 +878,7 @@ package Bootstrap{
             foreach(String ms in missingSlots){
                  missingSlotResult+="- ${ms}\n";}
 
-             throw ValidationException {
+             throw new ValidationException {
                     ValidationSource = this;
                     Meta = this;
                     Instances =  new Base[];//TODO 0615 - should be instances
@@ -875,6 +891,8 @@ package Bootstrap{
         }
     }
 
+	entity ContractSlot: Annotation {}
+
 	entity FinalInstance: Annotation{
 		override operation Bool Check(Base definedFor, Object appliesOn, Base? containerContext)
 		{
@@ -882,7 +900,7 @@ package Bootstrap{
 			Bool hasError = false;
 			if (appliesOn!=definedFor)
 			{
-				throw ValidationException {
+				throw new ValidationException {
                     ValidationSource = this;
                     Meta = this;
                     Instances =  new Base[];//TODO 0615 - should be instances
@@ -901,7 +919,7 @@ package Bootstrap{
 				if (GetValue(s)==null) {
 					Cardinality card = s.GetAttributeByType(Cardinality);
 					if (card.GetMin()>0) {
-						throw ValidationException {
+						throw new ValidationException {
 							ValidationSource = this;
 							Meta = this;
 							Instances =  new Base[];//TODO 0615 - should be instances
@@ -909,7 +927,6 @@ package Bootstrap{
 							ErrorCode = "BS_FinalInstance_1";
 							Message = "Slot ${GetID(s)} is not optional, but it does not have a value in final instance";
 						};
-						//PrintLn("Slot ${GetID(s)} is not optional, but it does not have a value in final instance", "red");
 						return false;
 					}
 				}
@@ -922,7 +939,7 @@ package Bootstrap{
 						{
 							if (!IsFinal(slotValue))
 							{
-								throw ValidationException {
+								throw new ValidationException {
 									ValidationSource = this;
 									Meta = this;
 									Instances =  new Base[];//TODO 0615 - should be instances
@@ -930,7 +947,7 @@ package Bootstrap{
 									ErrorCode = "BS_FinalInstance_2";
 									Message = "Slot ${GetID(s)} is mandatory but it does not have an appropriate (final) value";
 								};
-								//PrintLn("Slot ${GetID(s)} is mandatory but it does not have an appropriate (final) value", "red");
+				
 								return false;
 							}
 						}

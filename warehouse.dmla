@@ -211,7 +211,7 @@ package WarehousePackage {
             {
                 CurrencyValue? SSP=subject->SSP;
                 if (SSP!=null&&SSP->Currency!=currency!!) 
-                    throw ValidationException {
+                    throw new ValidationException {
                             ValidationSource = this;
                             Meta = this;
                             Instances = new Base[];
@@ -224,7 +224,7 @@ package WarehousePackage {
                 if (ReducedPrice!=null){
                     
                     if (ReducedPrice->Currency!=currency!!) 
-                       throw ValidationException {
+                       throw new ValidationException {
                             ValidationSource = this;
                             Meta = this;
                             Instances = new Base[];
@@ -234,7 +234,7 @@ package WarehousePackage {
                         };
                     
                     if (ReducedPrice->Amount>SSP->Amount) 
-                        throw ValidationException {
+                        throw new ValidationException {
                             ValidationSource = this;
                             Meta = this;
                             Instances = new Base[];
