@@ -4,8 +4,40 @@ package Bootstrap{
 		Built-in operations
 		-------------------
 	*/
+	operation Object[] getValues(Base subject){
+		return GetValues(subject);
+	}
+
+	operation Bool contains(Object[] list, Base attrib){
+		return Contains(list, attrib);
+	}
+
+	operation void setValues(Slot target, Object[] values){
+		SetValues(target, values);
+	}
+
+	operation void add(Object[] list, Base value){
+		Add(list, value);
+	}
+
+	operation Base? getMeta(Base subject){
+		return GetMeta(subject);
+	}
+
+	operation String getID(Base? value){
+		return GetID(value);
+	}
+
+	operation String getLocalID(Base attribute){
+		return GetLocalID(attribute);
+	}
+
 	operation Bool IsPrimitiveLiteral(Object subject){
 		return subject is Bool||subject is String||subject is Number;
+	}
+
+	operation void printLn(String msg, String color = "white"){
+		PrintLn(msg, color);
 	}
 
 	operation void PrintError(String errorMsg){
@@ -121,6 +153,7 @@ package Bootstrap{
 				// [Code: ${exc->ErrorCode}] '${exc->Message}' [Src: ${GetID((exc->ValidationSource)!!)} Meta: ${exc->Meta==null?null:GetID((exc->Meta)!!)}  Inst: ${exc->Instances==null?null:GetID((exc->Instances)!!)}]", "red");
             }
         }
+		PrintLn("Validation completed!", "green");
     }
 
 	//newID == null - does not work :o

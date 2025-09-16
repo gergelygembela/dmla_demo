@@ -1,5 +1,4 @@
 package WarehousePackage {
-    import Bootstrap
     import Utility
     
     entity Warehouse: Classifier {
@@ -23,27 +22,28 @@ package WarehousePackage {
         operation Bool AddProduct(PST subject)
         {
             if (subject.GetAttributeByType(FinalInstance)==null){
-                PrintError("${GetID(subject)} is not final, cannot be added.");
+                PrintError("${getID(subject)} is not final, cannot be added.");
                 return false;
             }
 
             //Check registered PSTs
             Base[] registeredPSTs=new Base[];
             if (this.Portfolio!=null)     
-                foreach(Base pst in GetValues(this.Portfolio))
+                foreach(Base pst in getValues(this.Portfolio))
                 {   
-                    Add(registeredPSTs, pst->Item);
+                    add(registeredPSTs, pst->Item);
                 }
 
-            if (!Contains(registeredPSTs, subject is BulkProduct?subject.FindMeta(BulkProduct):subject.FindMeta(PST)!!))
+            Base testSubject = BulkProduct?subject.FindMeta(BulkProduct):subject.FindMeta(PST)!!;
+            if (!contains(registeredPSTs, subject.isTransitiveInstance(testSubject)))
             {
-                    PrintError("The Product specification type (${GetLocalID(subject.FindMeta(PST)!!)}) of ${GetID(subject)} is not registered in warehouse '${GetLocalID(this)}'!");
+                    PrintError("The Product specification type (${getLocalID(subject.FindMeta(PST)!!)}) of ${getID(subject)} is not registered in warehouse '${getLocalID(this)}'!");
                     return false;     
             }
 
-            if (this.Stock!=null&&Contains(GetValues(this.Stock)!!, subject))
+            if (this.Stock!=null&&contains(getValues(this.Stock)!!, subject))
             {
-                PrintError("The Product ${GetID(subject)} is already in warehouse '${GetLocalID(this)}'!");
+                PrintError("The Product ${getID(subject)} is already in warehouse '${getLocalID(this)}'!");
                 return false;     
             }
                         
@@ -54,13 +54,13 @@ package WarehousePackage {
         operation void SellProduct(PST subject, Number Amount = 1)
         {
             if (subject.GetAttributeByType(FinalInstance)==null){
-                PrintError("${GetID(subject)} is not final, cannot be sold.");
+                PrintError("${getID(subject)} is not final, cannot be sold.");
                 return;
             }
                         
-            if (this.Stock==null||!Contains(GetValues(this.Stock)!!, subject))
+            if (this.Stock==null||!contains(getValues(this.Stock)!!, subject))
             {
-                PrintError("Product ${GetID(subject)} is not in warehouse '${GetLocalID(this)}'!");
+                PrintError("Product ${getID(subject)} is not in warehouse '${getLocalID(this)}'!");
                 return;
             }
 
@@ -81,10 +81,10 @@ package WarehousePackage {
             Number price = subject.GetPrice()!! * Amount;
             if (this.SaleStatistics==null) {
                 this.getOrCreateInstanceSlot(Warehouse.SaleStatistics);
-                SetValues(this.SaleStatistics, new Object[]);
+                setValues(this.SaleStatistics, new Object[]);
             }
 
-            Base currentMeta = GetMeta(subject)!!;
+            Base currentMeta = getMeta(subject)!!;
             while(currentMeta != PST && currentMeta != BulkProduct) {
                 Bool metaFound= false;
                 foreach(SaleStat item in this.GetAll(Warehouse.SaleStatistics)){
@@ -103,13 +103,13 @@ package WarehousePackage {
                                         .Set(SaleStat.Item, currentMeta)
                                         .Set(SaleStat.SoldValue, price));
                 }
-                currentMeta = GetMeta(currentMeta)!!;
+                currentMeta = getMeta(currentMeta)!!;
             }
 
             Bool isEmpty =true;            
             if (subject is BulkProduct)
             {
-                foreach(SaleStat product in GetValues(this.Stock)) {
+                foreach(SaleStat product in getValues(this.Stock)) {
                     if (product == subject)
                     {
                         Number itemCount = product->PackSize * Amount;
@@ -130,27 +130,27 @@ package WarehousePackage {
 
         operation void ShowSaleStatistics()
         {
-            PrintLn("Sale stat of (${GetLocalID(this)}):");
+            printLn("Sale stat of (${getLocalID(this)}):");
             if (this.SaleStatistics!=null)
             {
                 foreach(SaleStat item in this.GetAll(Warehouse.SaleStatistics))
                 {
-                    PrintLn("${GetLocalID((item->Item)!!)} ${(item->SoldValue)} ${GetLocalID(item->Item->Currency)}");
+                    printLn("${getLocalID((item->Item)!!)} ${(item->SoldValue)} ${getLocalID(item->Item->Currency)}");
                 }
             }
-            PrintLn("----------------------------------");
+            printLn("----------------------------------");
         }
 
         operation void ShowProducts()
         {
-            PrintLn("Products in warehouse ${GetLocalID(this)}: ");
+            printLn("Products in warehouse ${getLocalID(this)}: ");
 
             if (this->Stock!=null)
-            foreach(PST item in GetValues(this.Stock))
+            foreach(PST item in getValues(this.Stock))
             {
-                PrintLn("> ${GetLocalID((item)!!)}");
+                printLn("> ${getLocalID((item)!!)}");
             }
-            PrintLn("----------------------------------");
+            printLn("----------------------------------");
         }
     }
 
@@ -217,7 +217,7 @@ package WarehousePackage {
                             Instances = new Base[];
                             Category = "Warehouse";
                             ErrorCode = "WH_1";
-                            Message = "Invalid currency: ${GetLocalID(currency!!)} vs ${GetLocalID((SSP->Currency)!!)}";
+                            Message = "Invalid currency: ${getLocalID(currency!!)} vs ${getLocalID((SSP->Currency)!!)}";
                         };
 
                 CurrencyValue? ReducedPrice=subject->ReducedPrice;
@@ -230,7 +230,7 @@ package WarehousePackage {
                             Instances = new Base[];
                             Category = "Warehouse";
                             ErrorCode = "WH_2";
-                            Message = "Invalid currency: ${GetLocalID(currency!!)} vs ${GetLocalID((ReducedPrice->Currency)!!)}";
+                            Message = "Invalid currency: ${getLocalID(currency!!)} vs ${getLocalID((ReducedPrice->Currency)!!)}";
                         };
                     
                     if (ReducedPrice->Amount>SSP->Amount) 
